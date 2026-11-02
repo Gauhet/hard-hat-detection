@@ -1,7 +1,7 @@
 """Find heads with and without hard hats in your own photos or videos, and save annotated copies.
 
     python -m hardhat_detector.predict site.jpg [more photos or videos...]
-    python -m hardhat_detector.predict clip.mp4 --model checkpoints/yolov8n.pt
+    python -m hardhat_detector.predict clip.mp4 --conf 0.4
 """
 
 import argparse
@@ -18,6 +18,15 @@ from hardhat_detector.draw import draw_boxes, draw_detections
 VIDEO_SUFFIXES = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 
+def detect(model: YOLO, image, conf: float = 0.25):
+    """Run the detector on one photo (a path or a PIL image) and return its result.
+
+    Overlapping boxes are suppressed across classes, not within each class (Ultralytics'
+    default), so one head can't come back labelled both "helmet" and "head".
+    """
+    return model.predict(image, conf=conf, agnostic_nms=True, verbose=False)[0]
+
+
 def count(result) -> dict[str, int]:
     classes = result.boxes.cls.cpu().numpy().astype(int)
     return {name: int((classes == i).sum()) for i, name in enumerate(CLASSES)}
@@ -25,7 +34,7 @@ def count(result) -> dict[str, int]:
 
 def annotate_image(model: YOLO, path: str | Path, conf: float = 0.25) -> tuple[Image.Image, dict[str, int]]:
     image = Image.open(path).convert("RGB")
-    result = model.predict(image, conf=conf, verbose=False)[0]
+    result = detect(model, image, conf)
     return draw_detections(image, result), count(result)
 
 
@@ -52,7 +61,7 @@ def annotate_video(
         if not ok:
             break
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        boxes = model.predict(image, conf=conf, verbose=False)[0].boxes
+        boxes = detect(model, image, conf).boxes
         classes = boxes.cls.cpu().numpy()
         annotated = draw_boxes(image, boxes.xyxy.cpu().numpy(), classes, boxes.conf.cpu().numpy())
         writer.write(cv2.cvtColor(np.asarray(annotated), cv2.COLOR_RGB2BGR))
@@ -67,7 +76,7 @@ def annotate_video(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("inputs", nargs="+")
-    parser.add_argument("--model", default="checkpoints/yolov8s.pt")
+    parser.add_argument("--model", default="checkpoints/yolov8n.pt")
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--out-dir", default="predictions")
     args = parser.parse_args()

@@ -1,0 +1,111 @@
+{
+  "model": "yolov8s_hhw_only",
+  "parameters": 11136374,
+  "conf_threshold": 0.25,
+  "splits": {
+    "test": {
+      "mAP50": 0.972799696755289,
+      "mAP50-95": 0.6720579799008399,
+      "per_class": {
+        "helmet": {
+          "AP50": 0.9823997468969835,
+          "AP50-95": 0.6736065378289522
+        },
+        "head": {
+          "AP50": 0.9631996466135945,
+          "AP50-95": 0.6705094219727279
+        }
+      },
+      "recall_by_size": {
+        "small": {
+          "boxes": 2926,
+          "recall": 0.9490772385509227
+        },
+        "medium": {
+          "boxes": 3296,
+          "recall": 0.9739077669902912
+        },
+        "large": {
+          "boxes": 444,
+          "recall": 0.9864864864864865
+        }
+      },
+      "bare_head_recall_by_size": {
+        "small": {
+          "boxes": 937,
+          "recall": 0.9541088580576307
+        },
+        "medium": {
+          "boxes": 848,
+          "recall": 0.9716981132075472
+        },
+        "large": {
+          "boxes": 18,
+          "recall": 1.0
+        }
+      },
+      "alarm": {
+        "photos": 1766,
+        "photos_with_bare_head": 339,
+        "true_alarms": 320,
+        "false_alarms": 47,
+        "missed": 19,
+        "precision": 0.8719346049046321,
+        "recall": 0.943952802359882
+      }
+    },
+    "test_roboflow": {
+      "mAP50": 0.6269183989442957,
+      "mAP50-95": 0.2685707283109429,
+      "per_class": {
+        "helmet": {
+          "AP50": 0.7321517509432172,
+          "AP50-95": 0.23677910278939424
+        },
+        "head": {
+          "AP50": 0.5216850469453742,
+          "AP50-95": 0.30036235383249166
+        }
+      },
+      "recall_by_size": {
+        "small": {
+          "boxes": 891,
+          "recall": 0.5925925925925926
+        },
+        "medium": {
+          "boxes": 2720,
+          "recall": 0.8488970588235294
+        },
+        "large": {
+          "boxes": 752,
+          "recall": 0.776595744680851
+        }
+      },
+      "bare_head_recall_by_size": {
+        "small": {
+          "boxes": 64,
+          "recall": 0.625
+        },
+        "medium": {
+          "boxes": 430,
+          "recall": 0.7534883720930232
+        },
+        "large": {
+          "boxes": 117,
+          "recall": 0.6495726495726496
+        }
+      },
+      "alarm": {
+        "photos": 1399,
+        "photos_with_bare_head": 141,
+        "true_alarms": 123,
+        "false_alarms": 119,
+        "missed": 18,
+        "precision": 0.5082644628099173,
+        "recall": 0.8723404255319149
+      }
+    }
+  },
+  "gpu_ms": 9.773949976079166,
+  "cpu_ms": 92.67944999737665
+}

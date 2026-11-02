@@ -15,11 +15,11 @@ from ultralytics import YOLO
 
 from hardhat_detector.data import prepare_dataset
 from hardhat_detector.draw import draw_detections
-from hardhat_detector.predict import annotate_video, count
+from hardhat_detector.predict import annotate_video, count, detect
 
 ROOT = Path(__file__).parent
 MODELS = {path.stem: YOLO(path) for path in sorted((ROOT / "checkpoints").glob("yolov8*.pt"))}
-DEFAULT_MODEL = "yolov8s" if "yolov8s" in MODELS else next(iter(MODELS))
+DEFAULT_MODEL = "yolov8n" if "yolov8n" in MODELS else next(iter(MODELS))
 prepare_dataset(ROOT / "data")
 TEST_PHOTOS = sorted((ROOT / "data" / "images" / "test").glob("*.jpg"))
 MAX_VIDEO_SECONDS = 20
@@ -34,7 +34,7 @@ def summary(counts: dict[str, int]) -> str:
 def detect_photo(image: Image.Image | None, model_name: str, conf: float) -> tuple[Image.Image | None, str]:
     if image is None:
         return None, ""
-    result = MODELS[model_name].predict(image, conf=conf, verbose=False)[0]
+    result = detect(MODELS[model_name], image, conf)
     return draw_detections(image.convert("RGB"), result), summary(count(result))
 
 
@@ -60,7 +60,8 @@ with gr.Blocks(title="Hard Hat Detection") as demo:
     gr.Markdown(
         "# Hard Hat Detection\n"
         "YOLOv8 fine-tuned to find construction workers' heads and say whether each one is wearing a hard hat "
-        "(green) or not (red)."
+        "(green) or not (red). `yolov8n` is trained on both datasets; any `_hhw_only` models are the earlier "
+        "ones trained on Hard Hat Workers alone, kept for comparison."
     )
     with gr.Row():
         model_name = gr.Dropdown(list(MODELS), value=DEFAULT_MODEL, label="Model")

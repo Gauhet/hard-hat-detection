@@ -1,42 +1,111 @@
 {
   "model": "yolov8n",
   "parameters": 3138246,
-  "mAP50": 0.973062984881139,
-  "mAP50-95": 0.669909435972497,
-  "per_class": {
-    "helmet": {
-      "AP50": 0.978602879378996,
-      "AP50-95": 0.6749341291716752
-    },
-    "head": {
-      "AP50": 0.9675230903832819,
-      "AP50-95": 0.6648847427733188
-    }
-  },
   "conf_threshold": 0.25,
-  "recall_by_size": {
-    "small": {
-      "boxes": 2926,
-      "recall": 0.9408749145591251
+  "splits": {
+    "test": {
+      "mAP50": 0.9708940648352684,
+      "mAP50-95": 0.665181209838239,
+      "per_class": {
+        "helmet": {
+          "AP50": 0.9751795521623415,
+          "AP50-95": 0.6636256445405947
+        },
+        "head": {
+          "AP50": 0.9666085775081952,
+          "AP50-95": 0.6667367751358835
+        }
+      },
+      "recall_by_size": {
+        "small": {
+          "boxes": 2926,
+          "recall": 0.9261790840738209
+        },
+        "medium": {
+          "boxes": 3296,
+          "recall": 0.9654126213592233
+        },
+        "large": {
+          "boxes": 444,
+          "recall": 0.9662162162162162
+        }
+      },
+      "bare_head_recall_by_size": {
+        "small": {
+          "boxes": 937,
+          "recall": 0.919957310565635
+        },
+        "medium": {
+          "boxes": 848,
+          "recall": 0.9481132075471698
+        },
+        "large": {
+          "boxes": 18,
+          "recall": 1.0
+        }
+      },
+      "alarm": {
+        "photos": 1766,
+        "photos_with_bare_head": 339,
+        "true_alarms": 305,
+        "false_alarms": 35,
+        "missed": 34,
+        "precision": 0.8970588235294118,
+        "recall": 0.8997050147492626
+      }
     },
-    "medium": {
-      "boxes": 3296,
-      "recall": 0.9739077669902912
-    },
-    "large": {
-      "boxes": 444,
-      "recall": 0.9774774774774775
+    "test_roboflow": {
+      "mAP50": 0.9097053370991964,
+      "mAP50-95": 0.5530517405919454,
+      "per_class": {
+        "helmet": {
+          "AP50": 0.9309392667683613,
+          "AP50-95": 0.5317554652543609
+        },
+        "head": {
+          "AP50": 0.8884714074300316,
+          "AP50-95": 0.57434801592953
+        }
+      },
+      "recall_by_size": {
+        "small": {
+          "boxes": 891,
+          "recall": 0.7699214365881033
+        },
+        "medium": {
+          "boxes": 2720,
+          "recall": 0.9415441176470588
+        },
+        "large": {
+          "boxes": 752,
+          "recall": 0.961436170212766
+        }
+      },
+      "bare_head_recall_by_size": {
+        "small": {
+          "boxes": 64,
+          "recall": 0.640625
+        },
+        "medium": {
+          "boxes": 430,
+          "recall": 0.8837209302325582
+        },
+        "large": {
+          "boxes": 117,
+          "recall": 0.9572649572649573
+        }
+      },
+      "alarm": {
+        "photos": 1399,
+        "photos_with_bare_head": 141,
+        "true_alarms": 133,
+        "false_alarms": 14,
+        "missed": 8,
+        "precision": 0.9047619047619048,
+        "recall": 0.9432624113475178
+      }
     }
   },
-  "alarm": {
-    "photos": 1766,
-    "photos_with_bare_head": 339,
-    "true_alarms": 315,
-    "false_alarms": 55,
-    "missed": 24,
-    "precision": 0.8513513513513513,
-    "recall": 0.9292035398230089
-  },
-  "gpu_ms": 6.797449954319745,
-  "cpu_ms": 37.048099969979376
+  "gpu_ms": 6.409450026694685,
+  "cpu_ms": 37.087550037540495
 }

@@ -1,12 +1,14 @@
 {
   "model": "yolov8n",
-  "epochs": 50,
+  "name": null,
+  "epochs": 40,
   "imgsz": 640,
   "batch": 16,
   "patience": 15,
   "workers": 4,
+  "cache": "disk",
   "seed": 42,
   "data_dir": "data",
-  "epochs_run": 50,
-  "training_minutes": 39.3
+  "epochs_run": 40,
+  "training_minutes": 92.9
 }
