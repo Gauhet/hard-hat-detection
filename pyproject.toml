@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hard-hat-detection"
+version = "0.1.0"
+description = "Detects construction workers' heads with and without hard hats by fine-tuning YOLOv8."
+readme = "README.md"
+license = "AGPL-3.0-only"
+authors = [{ name = "Gauhet Poddar" }]
+requires-python = ">=3.10"
+dependencies = [
+    "ultralytics>=8.3,<9",
+    "matplotlib",
+    "numpy",
+    "Pillow",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+demo = ["gradio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

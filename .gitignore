@@ -1,0 +1,29 @@
+# Dataset (downloaded automatically on first run)
+data/
+
+# Model weights
+checkpoints/
+*.pt
+*.pth
+
+# Ultralytics training runs (per-epoch plots and weights)
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editors and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Annotated outputs from predict.py
+predictions/
