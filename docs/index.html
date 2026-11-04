@@ -260,7 +260,7 @@ window.detectUrl = async (url, conf = 0.25) => {
     ort.env.wasm.numThreads = 1;
     // Use the GPU through WebGPU where the browser supports it, otherwise the CPU through WebAssembly.
     const model = await fetch("model/yolov8n.onnx").then((r) => r.arrayBuffer());
-    $("placeholder").textContent = "Preparing the model on this device. The first time can take a few seconds…";
+    $("placeholder").textContent = "Preparing the model on this device. The first visit can take up to half a minute…";
     examples = await fetch("examples/list.json").then((r) => r.json());
     for (const provider of navigator.gpu ? ["webgpu", "wasm"] : ["wasm"]) {
       try {
