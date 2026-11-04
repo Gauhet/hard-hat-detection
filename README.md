@@ -6,6 +6,9 @@ Finds people's heads in photos and video and marks each one as wearing a hard ha
 (red). It fine-tunes a COCO-pretrained YOLOv8n on two public datasets and reaches **97.1% mAP50**
 on the standard Hard Hat Workers test set and **91.0%** on a second, more varied test set.
 
+**[Try it in your browser](https://gauhet.github.io/hard-hat-detection/)**: the model runs on your own
+device, so photos and videos aren't uploaded anywhere.
+
 ![Detections on construction-site footage](assets/demo.gif)
 
 <sub>Footage: U.S. Department of Labor (OSHA), public domain, via Wikimedia Commons. The model never saw it during training.</sub>
@@ -142,6 +145,15 @@ through the detector one at a time, drawn on, and written back out, along with a
 frames showed a bare head. YOLOv8n takes 6 ms per frame on the GPU and 37 ms on a CPU (Intel Core
 Ultra 7 155H).
 
+**Browser demo** ([`docs/index.html`](docs/index.html)). The trained model is exported to ONNX
+(`yolo export model=checkpoints/yolov8n.pt format=onnx imgsz=640 opset=17 simplify=True`) and run
+with ONNX Runtime Web: on the GPU through WebGPU where the browser supports it, and on the CPU
+through WebAssembly otherwise. The page reimplements YOLO's pre- and post-processing in JavaScript
+(letterboxing to 640×640, the confidence threshold, and non-maximum suppression across classes).
+On the 60 example photos it finds the same boxes as the Python version on 57; the differences are
+4 boxes scoring within 0.02 of the 0.25 threshold and one box that moved slightly. On my laptop a
+photo takes about 70 ms through WebGPU and 400 ms on the CPU.
+
 ## Running it
 
 Requires Python 3.10+. Install PyTorch for your hardware first
@@ -172,7 +184,7 @@ Run the detector on your own photos or videos (annotated copies go to `predictio
 python -m hardhat_detector.predict site.jpg clip.mp4
 ```
 
-Or try it in the browser: a Gradio app with a photo tab (upload or pull a random test photo) and
+Or run the local demo: a Gradio app with a photo tab (upload or pull a random test photo) and
 a video tab, and a choice of model and confidence threshold.
 
 ```bash
@@ -197,7 +209,8 @@ src/hardhat_detector/
   evaluate.py    test-set evaluation, model comparison and figures
   predict.py     detection on photos and videos
   draw.py        drawing boxes on images
-app.py           browser demo (Gradio)
+app.py           local demo (Gradio)
+docs/            in-browser demo on GitHub Pages: page, ONNX model and 60 example photos
 tests/           data, de-duplication, metrics and drawing checks
 results/         training logs and test metrics for each model
 assets/          figures and the demo GIF used in this README

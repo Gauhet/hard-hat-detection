@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hard Hat Detection</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Find construction workers with and without hard hats in photos and video. The YOLOv8 model runs in your browser.">
+<style>
+  :root {
+    --bg: #f7f8fa; --panel: #ffffff; --text: #1a202c; --muted: #4a5568; --faint: #718096;
+    --line: #e2e8f0; --accent: #dd6b20; --accent-text: #ffffff; --button: #edf2f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11151c; --panel: #1a202c; --text: #edf2f7; --muted: #cbd5e0; --faint: #a0aec0;
+            --line: #2d3748; --accent: #ed8936; --accent-text: #11151c; --button: #2d3748; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.5px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  a { color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 20px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, label.button { font: inherit; border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer;
+                         background: var(--button); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  input[type=file] { display: none; }
+  .slider { display: flex; align-items: center; gap: 10px; margin-left: auto; color: var(--muted); }
+  .slider input { width: 160px; accent-color: var(--accent); }
+  #stage { position: relative; margin-top: 16px; min-height: 240px; display: flex; align-items: center; justify-content: center;
+           background: var(--bg); border-radius: 8px; overflow: hidden; }
+  #canvas { max-width: 100%; max-height: 70vh; display: none; }
+  #placeholder { color: var(--faint); padding: 40px 16px; text-align: center; }
+  #summary { font-size: 20px; margin-top: 14px; min-height: 30px; }
+  #status { font-size: 14px; color: var(--faint); margin-top: 4px; min-height: 21px; }
+  .legend { display: inline-flex; gap: 14px; font-size: 14px; color: var(--muted); }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  footer { font-size: 14px; color: var(--faint); margin-top: 24px; }
+  @media (max-width: 600px) { .slider { margin-left: 0; width: 100%; } .slider input { flex: 1; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hard Hat Detection</h1>
+  <p>Finds construction workers' heads in a photo or video and marks each one as wearing a hard hat or not.
+     The model is a YOLOv8n fine-tuned on two public datasets: 97.1% mAP50 on the Hard Hat Workers test set,
+     91.0% on a second, more varied one. Code, training and evaluation:
+     <a href="https://github.com/Gauhet/hard-hat-detection">github.com/Gauhet/hard-hat-detection</a>.</p>
+  <p>The model runs in your browser, so your photos and videos are not uploaded anywhere.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <button class="primary" id="random" disabled>Random test photo</button>
+      <label class="button" for="file">Upload a photo or video</label>
+      <input type="file" id="file" accept="image/*,video/*">
+      <button id="pause" style="display:none">Pause</button>
+      <div class="slider">
+        <label for="conf">Confidence</label>
+        <input type="range" id="conf" min="0.05" max="0.95" step="0.05" value="0.25">
+        <span id="confValue">0.25</span>
+      </div>
+    </div>
+    <div id="stage">
+      <div id="placeholder">Loading the model (13 MB)…</div>
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="summary"></div>
+    <div class="legend"><span><span class="dot" style="background:#22c55e"></span>hard hat</span>
+                        <span><span class="dot" style="background:#ef4444"></span>no hard hat</span></div>
+    <div id="status"></div>
+  </div>
+
+  <footer>Example photos: the Hard Hat Workers test set (public domain). Inference: ONNX Runtime Web.
+    License: AGPL-3.0.</footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js"></script>
+<script>
+const SIZE = 640, IOU = 0.7, MAX_DET = 300;
+const CLASSES = ["helmet", "head"];
+const COLOURS = { helmet: "rgb(34,197,94)", head: "rgb(239,68,68)" };
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+const input = document.createElement("canvas"); input.width = input.height = SIZE;
+const inputCtx = input.getContext("2d", { willReadFrequently: true });
+
+let session = null, backend = "", examples = [], current = null;   // current: {source, raw, scale, left, top, w, h}
+let video = null, busy = false;
+let generation = 0;                    // bumped whenever a new photo or video is chosen
+let queue = Promise.resolve();         // the model runs one image at a time
+
+// Scale the image to fit 640x640 without distortion, pad with grey, and return a CHW float tensor.
+function preprocess(source, w, h) {
+  const scale = Math.min(SIZE / w, SIZE / h);
+  const nw = Math.round(w * scale), nh = Math.round(h * scale);
+  const left = Math.floor((SIZE - nw) / 2), top = Math.floor((SIZE - nh) / 2);
+  inputCtx.fillStyle = "rgb(114,114,114)"; inputCtx.fillRect(0, 0, SIZE, SIZE);
+  inputCtx.drawImage(source, left, top, nw, nh);
+  const pixels = inputCtx.getImageData(0, 0, SIZE, SIZE).data, area = SIZE * SIZE;
+  const data = new Float32Array(3 * area);
+  for (let i = 0; i < area; i++) {
+    data[i] = pixels[4 * i] / 255; data[area + i] = pixels[4 * i + 1] / 255; data[2 * area + i] = pixels[4 * i + 2] / 255;
+  }
+  return { tensor: new ort.Tensor("float32", data, [1, 3, SIZE, SIZE]), scale, left, top };
+}
+
+function iou(a, b) {
+  const w = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = w * h;
+  return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter);
+}
+
+// The raw output is 6 rows of 8400 candidates: box centre x, y, width, height, then one score per class.
+// Keep candidates above the threshold, suppress overlaps across classes, and map boxes back to the photo.
+function postprocess(raw, conf, frame) {
+  const n = raw.length / 6, found = [];
+  for (let i = 0; i < n; i++) {
+    const s0 = raw[4 * n + i], s1 = raw[5 * n + i], score = Math.max(s0, s1);
+    if (score <= conf) continue;
+    const cx = raw[i], cy = raw[n + i], bw = raw[2 * n + i], bh = raw[3 * n + i];
+    found.push({ box: [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2], score, cls: s1 > s0 ? 1 : 0 });
+  }
+  found.sort((a, b) => b.score - a.score);
+  const kept = [];
+  for (const d of found) {
+    if (kept.length === MAX_DET) break;
+    if (kept.every((k) => iou(k.box, d.box) <= IOU)) kept.push(d);
+  }
+  for (const d of kept) {
+    const [x1, y1, x2, y2] = d.box;
+    d.box = [Math.min(Math.max((x1 - frame.left) / frame.scale, 0), frame.w), Math.min(Math.max((y1 - frame.top) / frame.scale, 0), frame.h),
+             Math.min(Math.max((x2 - frame.left) / frame.scale, 0), frame.w), Math.min(Math.max((y2 - frame.top) / frame.scale, 0), frame.h)];
+  }
+  return kept;
+}
+
+function infer(source, w, h) {
+  const run = async () => {
+    const { tensor, scale, left, top } = preprocess(source, w, h);
+    const start = performance.now();
+    const out = await session.run({ images: tensor });
+    return { source, w, h, scale, left, top, raw: out.output0.data, ms: performance.now() - start };
+  };
+  const result = queue.then(run, run);
+  queue = result.catch(() => {});
+  return result;
+}
+
+// Same look as the Python demo: boxes scaled to the photo, least confident drawn first so the
+// most confident labels end up on top.
+function draw(frame, detections) {
+  canvas.width = frame.w; canvas.height = frame.h;
+  ctx.drawImage(frame.source, 0, 0, frame.w, frame.h);
+  const line = Math.max(2, Math.round(Math.max(frame.w, frame.h) / 300));
+  const font = Math.max(11, Math.round(Math.max(frame.w, frame.h) / 45));
+  ctx.font = `${font}px system-ui, sans-serif`; ctx.lineWidth = line; ctx.textBaseline = "top";
+  for (const d of [...detections].sort((a, b) => a.score - b.score)) {
+    const name = CLASSES[d.cls], colour = COLOURS[name], [x1, y1, x2, y2] = d.box;
+    ctx.strokeStyle = colour; ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    const text = `${name} ${d.score.toFixed(2)}`, tw = ctx.measureText(text).width, th = font + 2;
+    const top = Math.max(0, y1 - th - 2);
+    ctx.fillStyle = colour; ctx.fillRect(x1, top, tw + 4, th);
+    ctx.fillStyle = "white"; ctx.fillText(text, x1 + 2, top + 1);
+  }
+  canvas.style.display = "block"; $("placeholder").style.display = "none";
+}
+
+function summarise(detections) {
+  const hats = detections.filter((d) => d.cls === 0).length, heads = detections.length - hats;
+  return hats + heads === 0 ? "No heads found."
+    : `<b>${hats}</b> wearing a hard hat, <b>${heads}</b> without.`;
+}
+
+function render() {
+  if (!current) return;
+  const detections = postprocess(current.raw, Number($("conf").value), current);
+  draw(current, detections);
+  $("summary").innerHTML = summarise(detections);
+  window.lastDetections = detections;
+  return detections;
+}
+
+function stopVideo() {
+  if (video) { video.pause(); URL.revokeObjectURL(video.src); video = null; }
+  $("pause").style.display = "none";
+}
+
+async function showImage(url, label) {
+  stopVideo();
+  const gen = ++generation;
+  const img = new Image();
+  img.src = url; await img.decode();
+  const frame = await infer(img, img.naturalWidth, img.naturalHeight);
+  if (gen !== generation) return;      // another photo or video was chosen meanwhile
+  current = frame;
+  render();
+  $("status").textContent = `${label} · ${img.naturalWidth}×${img.naturalHeight} · detection took ${Math.round(current.ms)} ms on the ${backend}`;
+}
+
+// Videos play with live detection: each new frame is analysed as soon as the previous one is done.
+function showVideo(file) {
+  stopVideo();
+  const gen = ++generation;
+  video = document.createElement("video");
+  video.src = URL.createObjectURL(file); video.muted = true; video.loop = true; video.playsInline = true;
+  let frames = 0, started = performance.now();
+  const step = async () => {
+    if (!video || gen !== generation) return;
+    if (!video.paused && !busy && video.videoWidth) {
+      busy = true;
+      try {
+        const frame = await infer(video, video.videoWidth, video.videoHeight);
+        if (gen !== generation) return;
+        current = frame; render(); frames++;
+        const fps = frames / ((performance.now() - started) / 1000);
+        $("status").textContent = `${file.name} · ${video.videoWidth}×${video.videoHeight} · live detection at ${fps.toFixed(1)} frames per second on the ${backend}`;
+      } catch (err) {
+        $("status").textContent = "Detection failed on this frame: " + err.message;
+      } finally {
+        busy = false;
+      }
+    }
+    requestAnimationFrame(step);
+  };
+  video.addEventListener("loadeddata", () => { video.play(); $("pause").style.display = ""; $("pause").textContent = "Pause"; step(); }, { once: true });
+  video.addEventListener("error", () => { $("status").textContent = "This browser can't play that video format."; }, { once: true });
+}
+
+const failed = (err) => { $("status").textContent = "Couldn't read that image: " + err.message; };
+
+$("random").onclick = () => {
+  const name = examples[Math.floor(Math.random() * examples.length)];
+  showImage(`examples/${name}`, `Test photo ${name}`).catch(failed);
+};
+$("file").onchange = (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  if (file.type.startsWith("video/")) showVideo(file);
+  else showImage(URL.createObjectURL(file), file.name).catch(failed);
+  e.target.value = "";
+};
+$("pause").onclick = () => {
+  if (!video) return;
+  if (video.paused) { video.play(); $("pause").textContent = "Pause"; } else { video.pause(); $("pause").textContent = "Play"; }
+};
+$("conf").oninput = () => { $("confValue").textContent = Number($("conf").value).toFixed(2); render(); };
+
+// Exposed for automated checks: detections for one photo at a given threshold, in photo pixels.
+window.detectUrl = async (url, conf = 0.25) => {
+  const img = new Image(); img.src = url; await img.decode();
+  const frame = await infer(img, img.naturalWidth, img.naturalHeight);
+  return postprocess(frame.raw, conf, frame);
+};
+
+(async () => {
+  try {
+    ort.env.wasm.numThreads = 1;
+    // Use the GPU through WebGPU where the browser supports it, otherwise the CPU through WebAssembly.
+    const model = await fetch("model/yolov8n.onnx").then((r) => r.arrayBuffer());
+    $("placeholder").textContent = "Preparing the model on this device. The first time can take a few seconds…";
+    examples = await fetch("examples/list.json").then((r) => r.json());
+    for (const provider of navigator.gpu ? ["webgpu", "wasm"] : ["wasm"]) {
+      try {
+        session = await ort.InferenceSession.create(model, { executionProviders: [provider] });
+        const warmup = new ort.Tensor("float32", new Float32Array(3 * SIZE * SIZE), [1, 3, SIZE, SIZE]);
+        await session.run({ images: warmup });
+        backend = provider === "webgpu" ? "GPU (WebGPU)" : "CPU (WebAssembly)";
+        break;
+      } catch (err) {
+        session = null;
+        if (provider === "wasm") throw err;
+      }
+    }
+    $("random").disabled = false;
+    $("placeholder").textContent = "Try a random test photo, or upload your own photo or video.";
+    window.modelReady = true; window.backend = backend;
+  } catch (err) {
+    $("placeholder").textContent = "The model failed to load: " + err.message;
+  }
+})();
+</script>
+</body>
+</html>
